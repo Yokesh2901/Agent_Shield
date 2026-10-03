@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: agentshield-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: agentshield
+      POSTGRES_PASSWORD: agentshield_secret_password
+      POSTGRES_DB: agentshield_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentshield -d agentshield_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: agentshield-backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://agentshield:agentshield_secret_password@db:5432/agentshield_db
+      - SECRET_KEY=agentshield_super_secret_jwt_key_production_grade_32bytes_min
+      - LAYA_MODEL_NAME=english
+      - LAYA_MIN_CONFIDENCE=0.75
+    ports:
+      - "8000:8000"
+    command: sh -c "python seed.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: agentshield-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: agentshield-prometheus
+    restart: always
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+volumes:
+  postgres_data:
