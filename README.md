@@ -254,3 +254,5 @@ python -m pytest backend/tests -v
 ## License
 
 MIT License. Designed and engineered for production AI safety.
+#   A g e n t _ S h i e l d  
+ 
